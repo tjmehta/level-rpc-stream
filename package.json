@@ -1,0 +1,51 @@
+{
+  "name": "level-rpc-stream",
+  "version": "0.0.0",
+  "description": ".",
+  "main": "dist/level_rpc_stream.js",
+  "dependencies": {
+    "@types/duplexify": "^3.6.0",
+    "@types/through2": "^2.0.34",
+    "duplexify": "^4.1.1",
+    "mux-demux": "^3.7.9",
+    "through2": "^3.0.1"
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.5.5",
+    "@babel/core": "^7.5.5",
+    "@babel/preset-env": "^7.5.5",
+    "@babel/preset-typescript": "^7.3.3",
+    "@types/jest": "^24.0.15",
+    "@types/levelup": "^3.1.1",
+    "@types/p-defer": "^2.0.0",
+    "@types/prettier": "^1.16.4",
+    "@types/typescript": "^2.0.0",
+    "babel-jest": "^24.8.0",
+    "jest": "^24.8.0",
+    "level": "^5.0.1",
+    "p-defer": "^3.0.0",
+    "prettier": "^1.18.2",
+    "typescript": "^3.5.3"
+  },
+  "scripts": {
+    "build": "tsc src/* --outDir dist",
+    "test": "jest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tjmehta/level-rpc-stream.git"
+  },
+  "keywords": [
+    "level",
+    "rpc",
+    "stream",
+    "protocol",
+    "server"
+  ],
+  "author": "Tejesh Mehta",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/tjmehta/level-rpc-stream/issues"
+  },
+  "homepage": "https://github.com/tjmehta/level-rpc-stream#readme"
+}
