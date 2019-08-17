@@ -1,12 +1,12 @@
 "use strict";
-exports.__esModule = true;
+Object.defineProperty(exports, "__esModule", { value: true });
 exports.write = function (stream, chunk) {
     return stream.write(chunk);
 };
 exports.writeResultChunk = function (stream, id, result) {
     return exports.write(stream, {
         id: id,
-        result: result
+        result: result,
     });
 };
 exports.writeErrorChunk = function (stream, id, err) {
@@ -14,7 +14,7 @@ exports.writeErrorChunk = function (stream, id, err) {
         id: id,
         error: {
             message: err.message,
-            name: err.name
-        }
+            name: err.name,
+        },
     });
 };
