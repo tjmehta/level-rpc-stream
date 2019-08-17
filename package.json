@@ -28,7 +28,7 @@
     "typescript": "^3.5.3"
   },
   "scripts": {
-    "build": "tsc src/* --outDir dist",
+    "build": "tsc --build tsconfig.json",
     "test": "jest"
   },
   "repository": {
