@@ -1,3 +1,4 @@
+import MuxDemux, { HandleSubstreamType, OptsType } from 'mux-demux'
 import {
   ReqData,
   writeErrorChunk,
@@ -5,7 +6,6 @@ import {
 } from './stream_write_utils'
 
 import { LevelUp } from 'levelup'
-import MuxDemux from 'mux-demux/msgpack'
 import duplexify from 'duplexify'
 import through2 from 'through2'
 
@@ -17,6 +17,7 @@ export enum OPERATIONS {
   RSTREAM = 'RSTREAM',
   KSTREAM = 'KSTREAM',
   VSTREAM = 'VSTREAM',
+  DSTREAM = 'DSTREAM',
 }
 const opsStr = (() => {
   const ops = Object.keys(OPERATIONS)
@@ -27,15 +28,18 @@ const opsStr = (() => {
 export const RESPONSE_SUBSTREAM_ID = '__res__'
 
 export default function createLevelRPCStream(level: LevelUp) {
-  const mux = MuxDemux()
+  // state
+  const streams: Map<string, NodeJS.ReadableStream> = new Map()
+  const queries: Map<string, Promise<any>> = new Map()
+
+  // create outStream
+  const mux = MuxDemux({ objectMode: true })
   const resStream = mux.createWriteStream(RESPONSE_SUBSTREAM_ID)
-  const outStream = mux.pipe(through2.obj())
-  const inStream = through2.obj()
-  const levelInStream = through2.obj(function(
-    { id, op, args }: ReqData,
-    enc,
-    cb,
-  ) {
+  const outStream = mux
+
+  // create inStream
+  const inStream = through2.obj(function(chunk: ReqData, enc, cb) {
+    const { id, op, args } = chunk
     //validate leveldb state
     if (!level.isOpen()) {
       writeErrorChunk(resStream, id, new ClosedError('leveldb is closed'))
@@ -63,13 +67,26 @@ export default function createLevelRPCStream(level: LevelUp) {
       handleOperationPromise(id, level.batch(...args))
     } else if (op === OPERATIONS.RSTREAM) {
       // read stream operation
-      handleOperationStream(id, level.createReadStream(...args))
+      handleOperationStream(id, () => level.createReadStream(...args))
     } else if (op === OPERATIONS.KSTREAM) {
       // key stream operation
-      handleOperationStream(id, level.createKeyStream(...args))
+      handleOperationStream(id, () => level.createKeyStream(...args))
     } else if (op === OPERATIONS.VSTREAM) {
       // value stream operation
-      handleOperationStream(id, level.createValueStream(...args))
+      handleOperationStream(id, () => level.createValueStream(...args))
+    } else if (op === OPERATIONS.DSTREAM) {
+      const [streamId] = args
+      if (!streams.has(streamId)) {
+        writeErrorChunk(
+          resStream,
+          id,
+          new ReqError(`stream with id does not exist: ${streamId}`),
+        )
+      } else {
+        // @ts-ignore
+        const result = streams.get(streamId).destroy()
+        writeResultChunk(resStream, id, result)
+      }
     } else {
       // unknown operation
       writeErrorChunk(
@@ -91,29 +108,105 @@ export default function createLevelRPCStream(level: LevelUp) {
       return true
     }
     function handleOperationPromise(id: string, promise: Promise<any>) {
-      return promise
+      const p = promise
         .then(result => {
           writeResultChunk(resStream, id, result)
         })
         .catch(err => {
           writeErrorChunk(resStream, id, err)
         })
+        .finally(() => {
+          queries.delete(id)
+        })
+      queries.set(id, p)
+      return p
     }
-    function handleOperationStream(id: string, stream: NodeJS.ReadableStream) {
+    function handleOperationStream(
+      id: string,
+      createStream: () => NodeJS.ReadableStream,
+    ) {
+      if (streams.has(id)) {
+        writeErrorChunk(
+          resStream,
+          id,
+          new ReqError(`stream with id already exists: ${id}`),
+        )
+        return
+      }
+      // create stream
+      const stream = createStream()
+      streams.set(id, stream)
+      // create substream
       const substream = mux.createWriteStream(id)
       stream.pipe(substream)
-      stream.on('error', (err: Error) => substream.error(err.message))
+      // handle stream event
+      stream.once('end', handleEnd)
+      stream.once('error', handleError)
+      function handleEnd() {
+        stream.removeListener('error', handleError)
+        streams.delete(id)
+      }
+      function handleError(err: Error) {
+        stream.removeListener('end', handleEnd)
+        streams.delete(id)
+        substream.error(err.message)
+      }
     }
   })
 
-  if (level.isOpen()) {
-    inStream.pipe(levelInStream)
-  } else {
+  // create duplex
+  const duplex = duplexify.obj()
+
+  if (!level.isOpen()) {
     inStream.pause()
-    level.once('open', () => inStream.pipe(levelInStream))
+    level.once('open', () => {
+      duplex.setReadable(outStream)
+      duplex.setWritable(inStream)
+      inStream.resume()
+    })
+  } else {
+    duplex.setReadable(outStream)
+    duplex.setWritable(inStream)
+    inStream.resume()
   }
 
-  return duplexify.obj(inStream, outStream)
+  duplex.on('error', attemptCleanUp)
+  inStream.on('end', attemptCleanUp)
+  function attemptCleanUp(err?: Error) {
+    if (queries.size === 0) return cleanUp(err)
+    return Promise.all(queries.values())
+      .catch(err => console.error('query error while ending', err))
+      .finally(() => cleanUp(err))
+  }
+  function cleanUp(err?: Error) {
+    inStream.destroy()
+    streams.forEach((stream, id) => {
+      // @ts-ignore
+      stream.destroy()
+      streams.delete(id)
+    })
+    resStream.destroy()
+    if (err) {
+      outStream.emit('error', err)
+    } else {
+      outStream.end()
+    }
+  }
+
+  return duplex
+}
+
+export interface ObjOptsType extends Omit<OptsType, 'objectMode'> {}
+export const demux = (
+  opts: ObjOptsType | HandleSubstreamType,
+  onStream?: HandleSubstreamType,
+) => {
+  if (typeof opts === 'function') {
+    onStream = opts
+    opts = {}
+    return MuxDemux({ ...opts, objectMode: true }, onStream)
+  }
+  return MuxDemux({ ...opts, objectMode: true })
 }
 
 export class ClosedError extends Error {}

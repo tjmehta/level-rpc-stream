@@ -1,13 +1,12 @@
 declare module 'mux-demux' {
   import { Duplex, Readable, Writable } from 'stream'
   // opts type
-  interface OptsType {
+  export interface OptsType {
     circular?: boolean
     keepOpen?: boolean
     objectMode?: boolean
     unexpectedFinishError?: boolean
   }
-  interface ObjOptsType extends Omit<OptsType, 'objectMode'> {}
 
   class DuplexSubstream extends Duplex {
     meta: string
@@ -26,7 +25,7 @@ declare module 'mux-demux' {
   function handleSubstream(
     stream: DuplexSubstream | ReadableSubstream | WritableSubstream,
   ): void
-  type HandleSubstreamType = typeof handleSubstream
+  export type HandleSubstreamType = typeof handleSubstream
 
   // muxdemux type
   class MuxDemux extends Duplex {
