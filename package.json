@@ -6,6 +6,7 @@
   "dependencies": {
     "@types/duplexify": "^3.6.0",
     "@types/through2": "^2.0.34",
+    "buffer-json": "^2.0.0",
     "duplexify": "^4.1.1",
     "mux-demux": "^3.7.9",
     "through2": "^3.0.1"
@@ -21,7 +22,7 @@
     "@types/prettier": "^1.16.4",
     "@types/typescript": "^2.0.0",
     "babel-jest": "^24.8.0",
-    "jest": "^24.8.0",
+    "jest": "^24.9.0",
     "level": "^5.0.1",
     "p-defer": "^3.0.0",
     "prettier": "^1.18.2",

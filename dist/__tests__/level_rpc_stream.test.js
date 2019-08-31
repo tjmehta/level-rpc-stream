@@ -34,18 +34,25 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
         if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
     }
 };
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
+    result["default"] = mod;
+    return result;
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 var _this = this;
 Object.defineProperty(exports, "__esModule", { value: true });
 var level_rpc_stream_1 = require("../level_rpc_stream");
-var msgpack_1 = __importDefault(require("mux-demux/msgpack"));
+var level_rpc_stream_2 = __importStar(require("../level_rpc_stream"));
 var stream_1 = require("stream");
-var level_rpc_stream_2 = __importDefault(require("../level_rpc_stream"));
 var level_1 = __importDefault(require("level"));
 var p_defer_1 = __importDefault(require("p-defer"));
 var through2_1 = __importDefault(require("through2"));
+jest.setTimeout(100);
 jest.mock('level', function () { return function () {
     // imports
     var EventEmitter = require('events').EventEmitter;
@@ -150,6 +157,31 @@ describe('createLevelRPCStream', function () {
                 ctx.deferred = p_defer_1.default();
                 ctx.mockLevel.get.mockImplementation(function () { return ctx.deferred.promise; });
             });
+            describe('end tests', function () {
+                it('should end duplex on end after queries complete', function (done) {
+                    var count = 0;
+                    var stream = level_rpc_stream_2.default(ctx.mockLevel);
+                    var out = through2_1.default.obj();
+                    stream.pipe(out.resume());
+                    out.on('end', checkDone);
+                    writePromise(stream, {
+                        id: 'id',
+                        op: level_rpc_stream_1.OPERATIONS.GET,
+                        args: ['key'],
+                    }).then(checkDone);
+                    setTimeout(function () {
+                        stream.end();
+                    }, 0);
+                    setTimeout(function () {
+                        ctx.deferred.resolve('value');
+                    }, 10);
+                    function checkDone() {
+                        count++;
+                        if (count === 2)
+                            done();
+                    }
+                });
+            });
             describe('level get error', function () {
                 beforeEach(function () {
                     ctx.deferred.reject(new Error('boom'));
@@ -194,6 +226,32 @@ describe('createLevelRPCStream', function () {
                                 result = _b.sent();
                                 (_a = expect(ctx.mockLevel.get)).toHaveBeenCalledWith.apply(_a, args);
                                 expect(result).toMatchInlineSnapshot("\n            Object {\n              \"id\": \"id\",\n              \"result\": \"value\",\n            }\n          ");
+                                return [2 /*return*/];
+                        }
+                    });
+                }); });
+            });
+            describe('level get resolves (buffer)', function () {
+                beforeEach(function () {
+                    ctx.deferred.resolve(Buffer.from('valu2'));
+                });
+                it('should resolve w/ result', function () { return __awaiter(_this, void 0, void 0, function () {
+                    var stream, args, result;
+                    var _a;
+                    return __generator(this, function (_b) {
+                        switch (_b.label) {
+                            case 0:
+                                stream = level_rpc_stream_2.default(ctx.mockLevel);
+                                args = ['key'];
+                                return [4 /*yield*/, writePromise(stream, {
+                                        id: 'id',
+                                        op: level_rpc_stream_1.OPERATIONS.GET,
+                                        args: args,
+                                    })];
+                            case 1:
+                                result = _b.sent();
+                                (_a = expect(ctx.mockLevel.get)).toHaveBeenCalledWith.apply(_a, args);
+                                expect(result).toMatchInlineSnapshot("\n            Object {\n              \"id\": \"id\",\n              \"result\": Object {\n                \"__buff__\": \"dmFsdTI=\",\n              },\n            }\n          ");
                                 return [2 /*return*/];
                         }
                     });
@@ -248,7 +306,7 @@ describe('createLevelRPCStream', function () {
                             case 1:
                                 result = _b.sent();
                                 (_a = expect(ctx.mockLevel.del)).toHaveBeenCalledWith.apply(_a, args);
-                                expect(result).toMatchInlineSnapshot("\n            Object {\n              \"id\": \"id\",\n              \"result\": undefined,\n            }\n          ");
+                                expect(result).toMatchInlineSnapshot("\n            Object {\n              \"id\": \"id\",\n            }\n          ");
                                 return [2 /*return*/];
                         }
                     });
@@ -311,70 +369,7 @@ describe('createLevelRPCStream', function () {
                             case 1:
                                 result = _b.sent();
                                 (_a = expect(ctx.mockLevel.batch)).toHaveBeenCalledWith.apply(_a, ctx.args);
-                                expect(result).toMatchInlineSnapshot("\n            Object {\n              \"id\": \"id\",\n              \"result\": undefined,\n            }\n          ");
-                                return [2 /*return*/];
-                        }
-                    });
-                }); });
-            });
-        });
-        describe('mocked level batch', function () {
-            beforeEach(function () {
-                ctx.deferred = p_defer_1.default();
-                ctx.mockLevel.batch.mockImplementation(function () { return ctx.deferred.promise; });
-                ctx.args = [
-                    [
-                        { type: 'del', key: 'father' },
-                        { type: 'put', key: 'name', value: 'Yuri Irsenovich Kim' },
-                        { type: 'put', key: 'dob', value: '16 February 1941' },
-                        { type: 'put', key: 'spouse', value: 'Kim Young-sook' },
-                        { type: 'put', key: 'occupation', value: 'Clown' },
-                    ],
-                ];
-            });
-            describe('level batch error', function () {
-                beforeEach(function () {
-                    ctx.deferred.reject(new Error('boom'));
-                });
-                it('should reject w/ error', function () { return __awaiter(_this, void 0, void 0, function () {
-                    var stream, result;
-                    return __generator(this, function (_a) {
-                        switch (_a.label) {
-                            case 0:
-                                stream = level_rpc_stream_2.default(ctx.mockLevel);
-                                return [4 /*yield*/, writePromise(stream, {
-                                        id: 'id',
-                                        op: level_rpc_stream_1.OPERATIONS.BATCH,
-                                        args: ctx.args,
-                                    })];
-                            case 1:
-                                result = _a.sent();
-                                expect(result).toMatchInlineSnapshot("\n            Object {\n              \"error\": Object {\n                \"message\": \"boom\",\n                \"name\": \"Error\",\n              },\n              \"id\": \"id\",\n            }\n          ");
-                                return [2 /*return*/];
-                        }
-                    });
-                }); });
-            });
-            describe('level batch resolves', function () {
-                beforeEach(function () {
-                    ctx.deferred.resolve();
-                });
-                it('should resolve w/ result', function () { return __awaiter(_this, void 0, void 0, function () {
-                    var stream, result;
-                    var _a;
-                    return __generator(this, function (_b) {
-                        switch (_b.label) {
-                            case 0:
-                                stream = level_rpc_stream_2.default(ctx.mockLevel);
-                                return [4 /*yield*/, writePromise(stream, {
-                                        id: 'id',
-                                        op: level_rpc_stream_1.OPERATIONS.BATCH,
-                                        args: ctx.args,
-                                    })];
-                            case 1:
-                                result = _b.sent();
-                                (_a = expect(ctx.mockLevel.batch)).toHaveBeenCalledWith.apply(_a, ctx.args);
-                                expect(result).toMatchInlineSnapshot("\n            Object {\n              \"id\": \"id\",\n              \"result\": undefined,\n            }\n          ");
+                                expect(result).toMatchInlineSnapshot("\n            Object {\n              \"id\": \"id\",\n            }\n          ");
                                 return [2 /*return*/];
                         }
                     });
@@ -635,6 +630,63 @@ describe('createLevelRPCStream', function () {
                     }
                 });
             }); });
+            it('should destroy a stream', function () { return __awaiter(_this, void 0, void 0, function () {
+                var stream, reqId, result;
+                var _a;
+                return __generator(this, function (_b) {
+                    switch (_b.label) {
+                        case 0:
+                            stream = level_rpc_stream_2.default(ctx.mockLevel);
+                            reqId = 'id';
+                            stream.write({
+                                id: reqId,
+                                op: level_rpc_stream_1.OPERATIONS.VSTREAM,
+                                args: ctx.args,
+                            });
+                            return [4 /*yield*/, writePromise(stream, {
+                                    id: reqId + 2,
+                                    op: level_rpc_stream_1.OPERATIONS.DSTREAM,
+                                    args: [reqId],
+                                }, true)];
+                        case 1:
+                            result = _b.sent();
+                            (_a = expect(ctx.mockLevel.createValueStream)).toHaveBeenCalledWith.apply(_a, ctx.args);
+                            expect(result).toMatchInlineSnapshot("\n          Object {\n            \"id\": \"id2\",\n          }\n        ");
+                            return [2 /*return*/];
+                    }
+                });
+            }); });
+            it('should not destroy a non-existant stream', function () { return __awaiter(_this, void 0, void 0, function () {
+                var stream, reqId, result;
+                return __generator(this, function (_a) {
+                    switch (_a.label) {
+                        case 0:
+                            stream = level_rpc_stream_2.default(ctx.mockLevel);
+                            reqId = 'id';
+                            return [4 /*yield*/, writePromise(stream, {
+                                    id: reqId,
+                                    op: level_rpc_stream_1.OPERATIONS.DSTREAM,
+                                    args: ['nonExistantStreamId'],
+                                })];
+                        case 1:
+                            result = _a.sent();
+                            expect(result).toMatchInlineSnapshot("\n          Object {\n            \"error\": Object {\n              \"message\": \"stream with id does not exist: nonExistantStreamId\",\n              \"name\": \"Error\",\n            },\n            \"id\": \"id\",\n          }\n        ");
+                            return [2 /*return*/];
+                    }
+                });
+            }); });
+        });
+        describe('end tests', function () {
+            it('should end duplex on end', function (done) {
+                var stream = level_rpc_stream_2.default(ctx.mockLevel);
+                var out = through2_1.default.obj();
+                stream.pipe(out.resume());
+                out.on('end', done);
+                setTimeout(function () {
+                    stream.write({});
+                    stream.end();
+                }, 0);
+            });
         });
     });
 });
@@ -642,8 +694,7 @@ function onSubstreamEvent(stream, substreamId, event) {
     return __awaiter(this, void 0, void 0, function () {
         return __generator(this, function (_a) {
             return [2 /*return*/, new Promise(function (resolve) {
-                    stream
-                        .pipe(msgpack_1.default(function (substream) {
+                    stream.pipe(level_rpc_stream_2.demux(function (substream) {
                         var name = substream.meta;
                         if (name === level_rpc_stream_1.RESPONSE_SUBSTREAM_ID)
                             return;
@@ -652,27 +703,24 @@ function onSubstreamEvent(stream, substreamId, event) {
                             return;
                         }
                         substream.on(event, resolve);
-                    }))
-                        .pipe(stream);
+                    }));
                 })];
         });
     });
 }
-function writePromise(stream, data) {
+function writePromise(stream, data, hasStreams) {
     return __awaiter(this, void 0, void 0, function () {
         return __generator(this, function (_a) {
             return [2 /*return*/, new Promise(function (resolve, reject) {
-                    stream
-                        .pipe(msgpack_1.default(function (substream) {
+                    stream.pipe(level_rpc_stream_2.demux(function (substream) {
                         var name = substream.meta;
-                        if (name !== level_rpc_stream_1.RESPONSE_SUBSTREAM_ID) {
+                        if (!hasStreams && name !== level_rpc_stream_1.RESPONSE_SUBSTREAM_ID) {
                             console.warn('writePromise: unknown substream', name);
                             return;
                         }
                         substream.on('data', resolve);
                         substream.on('error', reject);
-                    }))
-                        .pipe(stream);
+                    }));
                     stream.write(data);
                 })];
         });

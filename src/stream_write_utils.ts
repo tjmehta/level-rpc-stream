@@ -25,11 +25,18 @@ export type ResData = ResultResData | ErrorResData
 
 export const write = (stream: Writable, chunk: ResData | EventResData) =>
   stream.write(chunk)
-export const writeResultChunk = (stream: Writable, id: string, result: any) =>
+export const writeResultChunk = (stream: Writable, id: string, result: any) => {
+  if (Buffer.isBuffer(result)) {
+    const buff: Buffer = result
+    result = {
+      __buff__: buff.toString('base64'),
+    }
+  }
   write(stream, {
     id,
     result,
   })
+}
 export const writeErrorChunk = (stream: Writable, id: string, err: Error) =>
   write(stream, {
     id,

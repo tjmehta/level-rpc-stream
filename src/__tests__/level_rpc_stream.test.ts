@@ -1,12 +1,13 @@
 import { OPERATIONS, RESPONSE_SUBSTREAM_ID } from '../level_rpc_stream'
+import createLevelRPCStream, { demux } from '../level_rpc_stream'
 
 import { Duplexify } from 'duplexify'
-import MuxDemux from 'mux-demux/msgpack'
 import { Stream } from 'stream'
-import createLevelRPCStream from '../level_rpc_stream'
 import level from 'level'
 import pDefer from 'p-defer'
 import through2 from 'through2'
+
+jest.setTimeout(100)
 
 jest.mock('level', () => () => {
   // imports
@@ -123,6 +124,31 @@ describe('createLevelRPCStream', () => {
         ctx.mockLevel.get.mockImplementation(() => ctx.deferred.promise)
       })
 
+      describe('end tests', () => {
+        it('should end duplex on end after queries complete', done => {
+          let count = 0
+          const stream = createLevelRPCStream(ctx.mockLevel)
+          const out = through2.obj()
+          stream.pipe(out.resume())
+          out.on('end', checkDone)
+          writePromise(stream, {
+            id: 'id',
+            op: OPERATIONS.GET,
+            args: ['key'],
+          }).then(checkDone)
+          setTimeout(() => {
+            stream.end()
+          }, 0)
+          setTimeout(() => {
+            ctx.deferred.resolve('value')
+          }, 10)
+          function checkDone() {
+            count++
+            if (count === 2) done()
+          }
+        })
+      })
+
       describe('level get error', () => {
         beforeEach(() => {
           ctx.deferred.reject(new Error('boom'))
@@ -167,6 +193,32 @@ describe('createLevelRPCStream', () => {
             Object {
               "id": "id",
               "result": "value",
+            }
+          `)
+        })
+      })
+
+      describe('level get resolves (buffer)', () => {
+        beforeEach(() => {
+          ctx.deferred.resolve(Buffer.from('valu2'))
+        })
+
+        it('should resolve w/ result', async () => {
+          const stream = createLevelRPCStream(ctx.mockLevel)
+          const args = ['key']
+          const result = await writePromise(stream, {
+            id: 'id',
+            op: OPERATIONS.GET,
+            args,
+          })
+
+          expect(ctx.mockLevel.get).toHaveBeenCalledWith(...args)
+          expect(result).toMatchInlineSnapshot(`
+            Object {
+              "id": "id",
+              "result": Object {
+                "__buff__": "dmFsdTI=",
+              },
             }
           `)
         })
@@ -222,7 +274,6 @@ describe('createLevelRPCStream', () => {
           expect(result).toMatchInlineSnapshot(`
             Object {
               "id": "id",
-              "result": undefined,
             }
           `)
         })
@@ -286,71 +337,6 @@ describe('createLevelRPCStream', () => {
           expect(result).toMatchInlineSnapshot(`
             Object {
               "id": "id",
-              "result": undefined,
-            }
-          `)
-        })
-      })
-    })
-
-    describe('mocked level batch', () => {
-      beforeEach(() => {
-        ctx.deferred = pDefer()
-        ctx.mockLevel.batch.mockImplementation(() => ctx.deferred.promise)
-        ctx.args = [
-          [
-            { type: 'del', key: 'father' },
-            { type: 'put', key: 'name', value: 'Yuri Irsenovich Kim' },
-            { type: 'put', key: 'dob', value: '16 February 1941' },
-            { type: 'put', key: 'spouse', value: 'Kim Young-sook' },
-            { type: 'put', key: 'occupation', value: 'Clown' },
-          ],
-        ]
-      })
-
-      describe('level batch error', () => {
-        beforeEach(() => {
-          ctx.deferred.reject(new Error('boom'))
-        })
-
-        it('should reject w/ error', async () => {
-          const stream = createLevelRPCStream(ctx.mockLevel)
-          const result = await writePromise(stream, {
-            id: 'id',
-            op: OPERATIONS.BATCH,
-            args: ctx.args,
-          })
-
-          expect(result).toMatchInlineSnapshot(`
-            Object {
-              "error": Object {
-                "message": "boom",
-                "name": "Error",
-              },
-              "id": "id",
-            }
-          `)
-        })
-      })
-
-      describe('level batch resolves', () => {
-        beforeEach(() => {
-          ctx.deferred.resolve()
-        })
-
-        it('should resolve w/ result', async () => {
-          const stream = createLevelRPCStream(ctx.mockLevel)
-          const result = await writePromise(stream, {
-            id: 'id',
-            op: OPERATIONS.BATCH,
-            args: ctx.args,
-          })
-
-          expect(ctx.mockLevel.batch).toHaveBeenCalledWith(...ctx.args)
-          expect(result).toMatchInlineSnapshot(`
-            Object {
-              "id": "id",
-              "result": undefined,
             }
           `)
         })
@@ -568,6 +554,68 @@ describe('createLevelRPCStream', () => {
         )
         expect(result).toBeUndefined()
       })
+
+      it('should destroy a stream', async () => {
+        const stream = createLevelRPCStream(ctx.mockLevel)
+        const reqId = 'id'
+        stream.write({
+          id: reqId,
+          op: OPERATIONS.VSTREAM,
+          args: ctx.args,
+        })
+        const result = await writePromise(
+          stream,
+          {
+            id: reqId + 2,
+            op: OPERATIONS.DSTREAM,
+            args: [reqId],
+          },
+          true,
+        )
+
+        expect(ctx.mockLevel.createValueStream).toHaveBeenCalledWith(
+          ...ctx.args,
+        )
+        expect(result).toMatchInlineSnapshot(`
+          Object {
+            "id": "id2",
+          }
+        `)
+      })
+
+      it('should not destroy a non-existant stream', async () => {
+        const stream = createLevelRPCStream(ctx.mockLevel)
+        const reqId = 'id'
+
+        const result = await writePromise(stream, {
+          id: reqId,
+          op: OPERATIONS.DSTREAM,
+          args: ['nonExistantStreamId'],
+        })
+
+        expect(result).toMatchInlineSnapshot(`
+          Object {
+            "error": Object {
+              "message": "stream with id does not exist: nonExistantStreamId",
+              "name": "Error",
+            },
+            "id": "id",
+          }
+        `)
+      })
+    })
+
+    describe('end tests', () => {
+      it('should end duplex on end', done => {
+        const stream = createLevelRPCStream(ctx.mockLevel)
+        const out = through2.obj()
+        stream.pipe(out.resume())
+        out.on('end', done)
+        setTimeout(() => {
+          stream.write({})
+          stream.end()
+        }, 0)
+      })
     })
   })
 })
@@ -578,37 +626,33 @@ async function onSubstreamEvent(
   event: string,
 ): Promise<any> {
   return new Promise(resolve => {
-    stream
-      .pipe(
-        MuxDemux(substream => {
-          const name = substream.meta
-          if (name === RESPONSE_SUBSTREAM_ID) return
-          if (name !== substreamId) {
-            console.warn('onSubstreamEvent: unknown substream', name)
-            return
-          }
-          substream.on(event, resolve)
-        }),
-      )
-      .pipe(stream)
+    stream.pipe(
+      demux(substream => {
+        const name = substream.meta
+        if (name === RESPONSE_SUBSTREAM_ID) return
+        if (name !== substreamId) {
+          console.warn('onSubstreamEvent: unknown substream', name)
+          return
+        }
+        substream.on(event, resolve)
+      }),
+    )
   })
 }
 
-async function writePromise(stream: Duplexify, data: {}) {
+async function writePromise(stream: Duplexify, data: {}, hasStreams?: boolean) {
   return new Promise((resolve, reject) => {
-    stream
-      .pipe(
-        MuxDemux(substream => {
-          const name = substream.meta
-          if (name !== RESPONSE_SUBSTREAM_ID) {
-            console.warn('writePromise: unknown substream', name)
-            return
-          }
-          substream.on('data', resolve)
-          substream.on('error', reject)
-        }),
-      )
-      .pipe(stream)
+    stream.pipe(
+      demux(substream => {
+        const name = substream.meta
+        if (!hasStreams && name !== RESPONSE_SUBSTREAM_ID) {
+          console.warn('writePromise: unknown substream', name)
+          return
+        }
+        substream.on('data', resolve)
+        substream.on('error', reject)
+      }),
+    )
     stream.write(data)
   })
 }
