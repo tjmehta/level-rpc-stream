@@ -119,7 +119,7 @@ describe('createLevelRPCStream', function () {
                                     })];
                             case 1:
                                 result = _a.sent();
-                                expect(result).toMatchInlineSnapshot("\n            Object {\n              \"error\": Object {\n                \"message\": \"boom\",\n                \"name\": \"Error\",\n              },\n              \"id\": \"id\",\n            }\n          ");
+                                expect(result).toMatchInlineSnapshot("\n            Object {\n              \"error\": [Error: boom],\n              \"id\": \"id\",\n            }\n          ");
                                 return [2 /*return*/];
                         }
                     });
@@ -199,7 +199,7 @@ describe('createLevelRPCStream', function () {
                                     })];
                             case 1:
                                 result = _a.sent();
-                                expect(result).toMatchInlineSnapshot("\n            Object {\n              \"error\": Object {\n                \"message\": \"boom\",\n                \"name\": \"Error\",\n              },\n              \"id\": \"id\",\n            }\n          ");
+                                expect(result).toMatchInlineSnapshot("\n            Object {\n              \"error\": [Error: boom],\n              \"id\": \"id\",\n            }\n          ");
                                 return [2 /*return*/];
                         }
                     });
@@ -236,7 +236,7 @@ describe('createLevelRPCStream', function () {
                     ctx.deferred.resolve(Buffer.from('valu2'));
                 });
                 it('should resolve w/ result', function () { return __awaiter(_this, void 0, void 0, function () {
-                    var stream, args, result;
+                    var stream, args, res;
                     var _a;
                     return __generator(this, function (_b) {
                         switch (_b.label) {
@@ -249,9 +249,11 @@ describe('createLevelRPCStream', function () {
                                         args: args,
                                     })];
                             case 1:
-                                result = _b.sent();
+                                res = _b.sent();
                                 (_a = expect(ctx.mockLevel.get)).toHaveBeenCalledWith.apply(_a, args);
-                                expect(result).toMatchInlineSnapshot("\n            Object {\n              \"id\": \"id\",\n              \"result\": Object {\n                \"__buff__\": \"dmFsdTI=\",\n              },\n            }\n          ");
+                                // @ts-ignore
+                                expect(res.result).toBeInstanceOf(Buffer);
+                                expect(res).toMatchInlineSnapshot("\n            Object {\n              \"id\": \"id\",\n              \"result\": Object {\n                \"data\": Array [\n                  118,\n                  97,\n                  108,\n                  117,\n                  50,\n                ],\n                \"type\": \"Buffer\",\n              },\n            }\n          ");
                                 return [2 /*return*/];
                         }
                     });
@@ -280,7 +282,7 @@ describe('createLevelRPCStream', function () {
                                     })];
                             case 1:
                                 result = _a.sent();
-                                expect(result).toMatchInlineSnapshot("\n            Object {\n              \"error\": Object {\n                \"message\": \"boom\",\n                \"name\": \"Error\",\n              },\n              \"id\": \"id\",\n            }\n          ");
+                                expect(result).toMatchInlineSnapshot("\n            Object {\n              \"error\": [Error: boom],\n              \"id\": \"id\",\n            }\n          ");
                                 return [2 /*return*/];
                         }
                     });
@@ -344,7 +346,7 @@ describe('createLevelRPCStream', function () {
                                     })];
                             case 1:
                                 result = _a.sent();
-                                expect(result).toMatchInlineSnapshot("\n            Object {\n              \"error\": Object {\n                \"message\": \"boom\",\n                \"name\": \"Error\",\n              },\n              \"id\": \"id\",\n            }\n          ");
+                                expect(result).toMatchInlineSnapshot("\n            Object {\n              \"error\": [Error: boom],\n              \"id\": \"id\",\n            }\n          ");
                                 return [2 /*return*/];
                         }
                     });
@@ -444,7 +446,7 @@ describe('createLevelRPCStream', function () {
                         case 0:
                             stream = level_rpc_stream_2.default(ctx.mockLevel);
                             reqId = 'id';
-                            eventPromise = onSubstreamEvent(stream, reqId, 'close');
+                            eventPromise = onSubstreamEvent(stream, reqId, 'end');
                             stream.write({
                                 id: reqId,
                                 op: level_rpc_stream_1.OPERATIONS.RSTREAM,
@@ -528,7 +530,7 @@ describe('createLevelRPCStream', function () {
                         case 0:
                             stream = level_rpc_stream_2.default(ctx.mockLevel);
                             reqId = 'id';
-                            eventPromise = onSubstreamEvent(stream, reqId, 'close');
+                            eventPromise = onSubstreamEvent(stream, reqId, 'end');
                             stream.write({
                                 id: reqId,
                                 op: level_rpc_stream_1.OPERATIONS.KSTREAM,
@@ -612,7 +614,7 @@ describe('createLevelRPCStream', function () {
                         case 0:
                             stream = level_rpc_stream_2.default(ctx.mockLevel);
                             reqId = 'id';
-                            eventPromise = onSubstreamEvent(stream, reqId, 'close');
+                            eventPromise = onSubstreamEvent(stream, reqId, 'end');
                             stream.write({
                                 id: reqId,
                                 op: level_rpc_stream_1.OPERATIONS.VSTREAM,
@@ -670,7 +672,7 @@ describe('createLevelRPCStream', function () {
                                 })];
                         case 1:
                             result = _a.sent();
-                            expect(result).toMatchInlineSnapshot("\n          Object {\n            \"error\": Object {\n              \"message\": \"stream with id does not exist: nonExistantStreamId\",\n              \"name\": \"Error\",\n            },\n            \"id\": \"id\",\n          }\n        ");
+                            expect(result).toMatchInlineSnapshot("\n          Object {\n            \"error\": [Error: stream with id does not exist: nonExistantStreamId],\n            \"id\": \"id\",\n          }\n        ");
                             return [2 /*return*/];
                     }
                 });
@@ -703,6 +705,7 @@ function onSubstreamEvent(stream, substreamId, event) {
                             return;
                         }
                         substream.on(event, resolve);
+                        substream.resume();
                     }));
                 })];
         });

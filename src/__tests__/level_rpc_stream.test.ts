@@ -83,10 +83,7 @@ describe('createLevelRPCStream', () => {
 
           expect(result).toMatchInlineSnapshot(`
             Object {
-              "error": Object {
-                "message": "boom",
-                "name": "Error",
-              },
+              "error": [Error: boom],
               "id": "id",
             }
           `)
@@ -164,10 +161,7 @@ describe('createLevelRPCStream', () => {
 
           expect(result).toMatchInlineSnapshot(`
             Object {
-              "error": Object {
-                "message": "boom",
-                "name": "Error",
-              },
+              "error": [Error: boom],
               "id": "id",
             }
           `)
@@ -206,18 +200,27 @@ describe('createLevelRPCStream', () => {
         it('should resolve w/ result', async () => {
           const stream = createLevelRPCStream(ctx.mockLevel)
           const args = ['key']
-          const result = await writePromise(stream, {
+          const res = await writePromise(stream, {
             id: 'id',
             op: OPERATIONS.GET,
             args,
           })
 
           expect(ctx.mockLevel.get).toHaveBeenCalledWith(...args)
-          expect(result).toMatchInlineSnapshot(`
+          // @ts-ignore
+          expect(res.result).toBeInstanceOf(Buffer)
+          expect(res).toMatchInlineSnapshot(`
             Object {
               "id": "id",
               "result": Object {
-                "__buff__": "dmFsdTI=",
+                "data": Array [
+                  118,
+                  97,
+                  108,
+                  117,
+                  50,
+                ],
+                "type": "Buffer",
               },
             }
           `)
@@ -246,10 +249,7 @@ describe('createLevelRPCStream', () => {
 
           expect(result).toMatchInlineSnapshot(`
             Object {
-              "error": Object {
-                "message": "boom",
-                "name": "Error",
-              },
+              "error": [Error: boom],
               "id": "id",
             }
           `)
@@ -310,10 +310,7 @@ describe('createLevelRPCStream', () => {
 
           expect(result).toMatchInlineSnapshot(`
             Object {
-              "error": Object {
-                "message": "boom",
-                "name": "Error",
-              },
+              "error": [Error: boom],
               "id": "id",
             }
           `)
@@ -396,7 +393,7 @@ describe('createLevelRPCStream', () => {
       it('should forward end events', async () => {
         const stream = createLevelRPCStream(ctx.mockLevel)
         const reqId = 'id'
-        const eventPromise = onSubstreamEvent(stream, reqId, 'close')
+        const eventPromise = onSubstreamEvent(stream, reqId, 'end')
         stream.write({
           id: reqId,
           op: OPERATIONS.RSTREAM,
@@ -464,7 +461,7 @@ describe('createLevelRPCStream', () => {
       it('should forward end events', async () => {
         const stream = createLevelRPCStream(ctx.mockLevel)
         const reqId = 'id'
-        const eventPromise = onSubstreamEvent(stream, reqId, 'close')
+        const eventPromise = onSubstreamEvent(stream, reqId, 'end')
         stream.write({
           id: reqId,
           op: OPERATIONS.KSTREAM,
@@ -536,7 +533,7 @@ describe('createLevelRPCStream', () => {
       it('should forward end events', async () => {
         const stream = createLevelRPCStream(ctx.mockLevel)
         const reqId = 'id'
-        const eventPromise = onSubstreamEvent(stream, reqId, 'close')
+        const eventPromise = onSubstreamEvent(stream, reqId, 'end')
         stream.write({
           id: reqId,
           op: OPERATIONS.VSTREAM,
@@ -595,10 +592,7 @@ describe('createLevelRPCStream', () => {
 
         expect(result).toMatchInlineSnapshot(`
           Object {
-            "error": Object {
-              "message": "stream with id does not exist: nonExistantStreamId",
-              "name": "Error",
-            },
+            "error": [Error: stream with id does not exist: nonExistantStreamId],
             "id": "id",
           }
         `)
@@ -635,6 +629,7 @@ async function onSubstreamEvent(
           return
         }
         substream.on(event, resolve)
+        substream.resume()
       }),
     )
   })

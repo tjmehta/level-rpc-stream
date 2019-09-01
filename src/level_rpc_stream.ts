@@ -1,4 +1,5 @@
-import MuxDemux, { HandleSubstreamType, OptsType } from 'mux-demux'
+import MuxDemux, { OptsType } from 'mux-demux'
+import { Readable, Stream } from 'stream'
 import {
   ReqData,
   writeErrorChunk,
@@ -6,8 +7,16 @@ import {
 } from './stream_write_utils'
 
 import { LevelUp } from 'levelup'
+import Pumpify from 'pumpify'
+import decodeBuffers from './decode_buffers_stream'
+import decodeErrors from './decode_errors_stream'
 import duplexify from 'duplexify'
+import encodeBuffers from './encode_buffers_stream'
+import encodeErrors from './encode_errors_stream'
 import through2 from 'through2'
+
+const pumpify = (...args: Stream[]) => new Pumpify(...args)
+pumpify.obj = (...args: Stream[]) => new Pumpify.obj(...args)
 
 export enum OPERATIONS {
   PUT = 'PUT',
@@ -34,8 +43,12 @@ export default function createLevelRPCStream(level: LevelUp) {
 
   // create outStream
   const mux = MuxDemux({ objectMode: true })
-  const resStream = mux.createWriteStream(RESPONSE_SUBSTREAM_ID)
   const outStream = mux
+  const resStream = pumpify.obj(
+    encodeBuffers('result'),
+    encodeErrors('error'),
+    mux.createWriteStream(RESPONSE_SUBSTREAM_ID),
+  )
 
   // create inStream
   const inStream = through2.obj(function(chunk: ReqData, enc, cb) {
@@ -133,13 +146,13 @@ export default function createLevelRPCStream(level: LevelUp) {
         )
         return
       }
-      // create stream
-      const stream = createStream()
-      streams.set(id, stream)
-      // create substream
+      // create dest substream
       const substream = mux.createWriteStream(id)
+      // create source stream
+      const stream = pumpify.obj(createStream(), encodeBuffers('key', 'value'))
+      streams.set(id, stream)
       stream.pipe(substream)
-      // handle stream event
+      // handle stream events
       stream.once('end', handleEnd)
       stream.once('error', handleError)
       function handleEnd() {
@@ -148,8 +161,8 @@ export default function createLevelRPCStream(level: LevelUp) {
       }
       function handleError(err: Error) {
         stream.removeListener('end', handleEnd)
-        streams.delete(id)
         substream.error(err.message)
+        streams.delete(id)
       }
     }
   })
@@ -196,15 +209,31 @@ export default function createLevelRPCStream(level: LevelUp) {
   return duplex
 }
 
+interface Substream extends Readable {
+  meta: string
+}
+
+export type HandleSubstreamType = (stream: Substream) => void
 export interface ObjOptsType extends Omit<OptsType, 'objectMode'> {}
 export const demux = (
   opts: ObjOptsType | HandleSubstreamType,
   onStream?: HandleSubstreamType,
 ) => {
   if (typeof opts === 'function') {
-    onStream = opts
+    onStream = opts as HandleSubstreamType
     opts = {}
-    return MuxDemux({ ...opts, objectMode: true }, onStream)
+  }
+  if (onStream) {
+    const _onStream: HandleSubstreamType = onStream
+    return MuxDemux({ ...opts, objectMode: true }, substream => {
+      const stream = (pumpify.obj(
+        substream,
+        decodeBuffers('key', 'val', 'result'),
+        decodeErrors('error'),
+      ) as unknown) as Substream
+      stream.meta = substream.meta
+      _onStream(stream)
+    })
   }
   return MuxDemux({ ...opts, objectMode: true })
 }
