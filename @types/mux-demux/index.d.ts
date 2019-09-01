@@ -8,23 +8,25 @@ declare module 'mux-demux' {
     unexpectedFinishError?: boolean
   }
 
-  class DuplexSubstream extends Duplex {
+  export class DuplexSubstream extends Duplex {
     meta: string
     error(message: string): void
   }
-  class ReadableSubstream extends Readable {
+  export class ReadableSubstream extends Readable {
     meta: string
-    error(message: string): void
   }
-  class WritableSubstream extends Writable {
+  export class WritableSubstream extends Writable {
     meta: string
     error(message: string): void
   }
 
+  export type Substream =
+    | DuplexSubstream
+    | ReadableSubstream
+    | WritableSubstream
+
   // handleStream type
-  function handleSubstream(
-    stream: DuplexSubstream | ReadableSubstream | WritableSubstream,
-  ): void
+  function handleSubstream(stream: Substream): void
   export type HandleSubstreamType = typeof handleSubstream
 
   // muxdemux type

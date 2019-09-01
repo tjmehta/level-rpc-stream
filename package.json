@@ -5,10 +5,11 @@
   "main": "dist/level_rpc_stream.js",
   "dependencies": {
     "@types/duplexify": "^3.6.0",
+    "@types/pumpify": "^1.4.1",
     "@types/through2": "^2.0.34",
-    "buffer-json": "^2.0.0",
     "duplexify": "^4.1.1",
     "mux-demux": "^3.7.9",
+    "pumpify": "^2.0.0",
     "through2": "^3.0.1"
   },
   "devDependencies": {
