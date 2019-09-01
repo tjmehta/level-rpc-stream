@@ -228,7 +228,7 @@ export const demux = (
     return MuxDemux({ ...opts, objectMode: true }, substream => {
       const stream = (pumpify.obj(
         substream,
-        decodeBuffers('key', 'val', 'result'),
+        decodeBuffers('key', 'value', 'result'),
         decodeErrors('error'),
       ) as unknown) as Substream
       stream.meta = substream.meta

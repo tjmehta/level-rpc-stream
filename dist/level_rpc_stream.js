@@ -236,7 +236,7 @@ exports.demux = function (opts, onStream) {
     if (onStream) {
         var _onStream_1 = onStream;
         return mux_demux_1.default(__assign({}, opts, { objectMode: true }), function (substream) {
-            var stream = pumpify.obj(substream, decode_buffers_stream_1.default('key', 'val', 'result'), decode_errors_stream_1.default('error'));
+            var stream = pumpify.obj(substream, decode_buffers_stream_1.default('key', 'value', 'result'), decode_errors_stream_1.default('error'));
             stream.meta = substream.meta;
             _onStream_1(stream);
         });
