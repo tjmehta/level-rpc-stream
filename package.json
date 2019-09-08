@@ -1,6 +1,6 @@
 {
   "name": "level-rpc-stream",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Control a level db over a duplex stream",
   "main": "dist/level_rpc_stream.js",
   "dependencies": {
