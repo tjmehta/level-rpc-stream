@@ -199,10 +199,10 @@ levelStream.write({
   args: [streamOpts],
 })
 
-// DEL operation
+// VSTREAM operation
 levelStream.write({
   id: 'some_unique_id',
-  op: OPERATIONS.DEL,
+  op: OPERATIONS.VSTREAM,
   args: [streamOpts],
 })
 ```
