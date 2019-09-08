@@ -5,10 +5,13 @@ import {
   writeErrorChunk,
   writeResultChunk,
 } from './stream_write_utils'
+import decodeBuffers, {
+  decodeBuffer,
+  isEncodedBuffer,
+} from './decode_buffers_stream'
 
 import { LevelUp } from 'levelup'
 import Pumpify from 'pumpify'
-import decodeBuffers from './decode_buffers_stream'
 import decodeErrors from './decode_errors_stream'
 import duplexify from 'duplexify'
 import encodeBuffers from './encode_buffers_stream'
@@ -34,7 +37,7 @@ const opsStr = (() => {
   return ops.join(', ') + `, or ${lastOp}`
 })()
 
-export const RESPONSE_SUBSTREAM_ID = '__res__'
+export const RESPONSE_SUBSTREAM_ID: string = '__res__'
 
 export default function createLevelRPCStream(level: LevelUp) {
   // state
@@ -52,7 +55,7 @@ export default function createLevelRPCStream(level: LevelUp) {
 
   // create inStream
   const inStream = through2.obj(function(chunk: ReqData, enc, cb) {
-    const { id, op, args } = chunk
+    const { id, op, args: _args } = chunk
     //validate leveldb state
     if (!level.isOpen()) {
       writeErrorChunk(resStream, id, new ClosedError('leveldb is closed'))
@@ -61,6 +64,11 @@ export default function createLevelRPCStream(level: LevelUp) {
     }
     //validate id
     if (!validateId(id)) return
+    // cast any encoded buffer args
+    const args = _args.map(arg => {
+      if (isEncodedBuffer(arg)) return decodeBuffer(arg)
+      return arg
+    })
     // has operation
     if (op === OPERATIONS.PUT) {
       // put operation
@@ -88,7 +96,7 @@ export default function createLevelRPCStream(level: LevelUp) {
       // value stream operation
       handleOperationStream(id, () => level.createValueStream(...args))
     } else if (op === OPERATIONS.DSTREAM) {
-      const [streamId] = args
+      const [streamId] = (args as any) as [string]
       if (!streams.has(streamId)) {
         writeErrorChunk(
           resStream,
@@ -209,8 +217,8 @@ export default function createLevelRPCStream(level: LevelUp) {
   return duplex
 }
 
-interface Substream extends Readable {
-  meta: string
+export interface Substream extends Readable {
+  id: string
 }
 
 export type HandleSubstreamType = (stream: Substream) => void
@@ -231,7 +239,7 @@ export const demux = (
         decodeBuffers('key', 'value', 'result'),
         decodeErrors('error'),
       ) as unknown) as Substream
-      stream.meta = substream.meta
+      stream.id = substream.meta
       _onStream(stream)
     })
   }

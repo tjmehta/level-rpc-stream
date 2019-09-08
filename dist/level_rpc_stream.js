@@ -26,11 +26,18 @@ var __assign = (this && this.__assign) || function () {
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
+    result["default"] = mod;
+    return result;
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 var mux_demux_1 = __importDefault(require("mux-demux"));
 var stream_write_utils_1 = require("./stream_write_utils");
+var decode_buffers_stream_1 = __importStar(require("./decode_buffers_stream"));
 var pumpify_1 = __importDefault(require("pumpify"));
-var decode_buffers_stream_1 = __importDefault(require("./decode_buffers_stream"));
 var decode_errors_stream_1 = __importDefault(require("./decode_errors_stream"));
 var duplexify_1 = __importDefault(require("duplexify"));
 var encode_buffers_stream_1 = __importDefault(require("./encode_buffers_stream"));
@@ -78,7 +85,7 @@ function createLevelRPCStream(level) {
     var resStream = pumpify.obj(encode_buffers_stream_1.default('result'), encode_errors_stream_1.default('error'), mux.createWriteStream(exports.RESPONSE_SUBSTREAM_ID));
     // create inStream
     var inStream = through2_1.default.obj(function (chunk, enc, cb) {
-        var id = chunk.id, op = chunk.op, args = chunk.args;
+        var id = chunk.id, op = chunk.op, _args = chunk.args;
         //validate leveldb state
         if (!level.isOpen()) {
             stream_write_utils_1.writeErrorChunk(resStream, id, new ClosedError('leveldb is closed'));
@@ -88,6 +95,12 @@ function createLevelRPCStream(level) {
         //validate id
         if (!validateId(id))
             return;
+        // cast any encoded buffer args
+        var args = _args.map(function (arg) {
+            if (decode_buffers_stream_1.isEncodedBuffer(arg))
+                return decode_buffers_stream_1.decodeBuffer(arg);
+            return arg;
+        });
         // has operation
         if (op === OPERATIONS.PUT) {
             // put operation
@@ -237,7 +250,7 @@ exports.demux = function (opts, onStream) {
         var _onStream_1 = onStream;
         return mux_demux_1.default(__assign({}, opts, { objectMode: true }), function (substream) {
             var stream = pumpify.obj(substream, decode_buffers_stream_1.default('key', 'value', 'result'), decode_errors_stream_1.default('error'));
-            stream.meta = substream.meta;
+            stream.id = substream.meta;
             _onStream_1(stream);
         });
     }

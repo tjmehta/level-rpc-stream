@@ -697,7 +697,7 @@ function onSubstreamEvent(stream, substreamId, event) {
         return __generator(this, function (_a) {
             return [2 /*return*/, new Promise(function (resolve) {
                     stream.pipe(level_rpc_stream_2.demux(function (substream) {
-                        var name = substream.meta;
+                        var name = substream.id;
                         if (name === level_rpc_stream_1.RESPONSE_SUBSTREAM_ID)
                             return;
                         if (name !== substreamId) {
@@ -716,7 +716,7 @@ function writePromise(stream, data, hasStreams) {
         return __generator(this, function (_a) {
             return [2 /*return*/, new Promise(function (resolve, reject) {
                     stream.pipe(level_rpc_stream_2.demux(function (substream) {
-                        var name = substream.meta;
+                        var name = substream.id;
                         if (!hasStreams && name !== level_rpc_stream_1.RESPONSE_SUBSTREAM_ID) {
                             console.warn('writePromise: unknown substream', name);
                             return;

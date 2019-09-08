@@ -622,7 +622,7 @@ async function onSubstreamEvent(
   return new Promise(resolve => {
     stream.pipe(
       demux(substream => {
-        const name = substream.meta
+        const name = substream.id
         if (name === RESPONSE_SUBSTREAM_ID) return
         if (name !== substreamId) {
           console.warn('onSubstreamEvent: unknown substream', name)
@@ -639,7 +639,7 @@ async function writePromise(stream: Duplexify, data: {}, hasStreams?: boolean) {
   return new Promise((resolve, reject) => {
     stream.pipe(
       demux(substream => {
-        const name = substream.meta
+        const name = substream.id
         if (!hasStreams && name !== RESPONSE_SUBSTREAM_ID) {
           console.warn('writePromise: unknown substream', name)
           return

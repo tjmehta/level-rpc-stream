@@ -13,7 +13,7 @@ exports.default = (function () {
         if (typeof chunk === 'object') {
             // decode buffer keys
             keys.forEach(function (key) {
-                if (chunk[key] && chunk[key].__buff__) {
+                if (isEncodedBuffer(chunk[key])) {
                     chunk[key] = decodeBuffer(chunk[key]);
                 }
             });
@@ -21,6 +21,11 @@ exports.default = (function () {
         cb(null, chunk);
     });
 });
+function isEncodedBuffer(obj) {
+    return Boolean(obj && typeof obj.__buff__ === 'string');
+}
+exports.isEncodedBuffer = isEncodedBuffer;
 function decodeBuffer(obj) {
     return Buffer.from(obj.__buff__, 'base64');
 }
+exports.decodeBuffer = decodeBuffer;
